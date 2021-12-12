@@ -28,19 +28,19 @@ A Python (3.6+) environment is required, preferably with Torch, Keras, and Trans
 5. Using the console, install the `usethis` package using `install.packages('usethis')`.
 6. Again, in the console, use the command `usethis` to create a new window called `.Renviron` which is like this: `usethis::edit_r_environ()`.
 7. Edit the `.Renviron` file by adding the line `RETICULATE_PYTHON="{{environment_path}}"`. For example, `RETICULATE_PYTHON="C:\\Users\\vinle\\miniconda3\\envs\\data_competition"`
-8. To note: For Windows-styled path names, the symbol `\` is an escape character. That should be replaced with `\\` instead. If there is any whitespace within that path (e.g. `“C:\\Users\\Vincent Leonardo”`), it needs to be replaced with `\ ` (e.g. `“C:\\User\\Vincent\ Leonardo”`).
+8. To note: For Windows-styled path names, the symbol `\` is an escape character. That should be replaced with `\\` instead. If there is any whitespace within that path (e.g. `“C:\\Users\\Vincent Leonardo”`), it needs to be replaced with `\` (e.g. `“C:\\User\\Vincent\ Leonardo”`).
 9. Save the `.Renviron` file and restart the R session. The installation process within the first two R blocks of the file should work now.
 
 The scripts were validated on the x86 architecture on R 4.1.2 and Python 3.9.7. The code optimises for the use of a GPU (the script to be commented out when using only CPU will be denoted in the script). It is not validated within the ARM architecture (e.g. Apple Silicon, Surface Pro X), and using it will require that care be taken to ensure both the R installation and Python installation are of the same architecture.
 
 ### R Packages Used
 
-- usethis (if needed)
-- reticulate
-- keras
-- tensorflow
-- dplyr
-- tfdatasets
+- `usethis` (if needed)
+- `reticulate`
+- `keras`
+- `tensorflow`
+- `dplyr`
+- `tfdatasets`
 
 ### Results
 
