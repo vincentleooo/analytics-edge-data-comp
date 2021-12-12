@@ -1,0 +1,181 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+# Installations and dependencies
+
+```{r include=FALSE}
+# IF THE R PACKAGES ARE NOT INSTALLED YET
+# install.packages(
+#   c(
+#     "keras",
+#     "tensorflow",
+#     "tfdatasets",
+#     "dplyr",
+#     "usethis",
+#     "reticulate"
+#   )
+# )
+
+```
+
+
+```{r include=FALSE}
+library(reticulate)
+reticulate::py_install('tensorflow', pip = TRUE)
+reticulate::py_install('torch', pip = TRUE)
+reticulate::py_install('transformers', pip = TRUE)
+
+# library(tidyverse)
+# library(textclean)
+library(keras)
+library(tensorflow)
+library(dplyr)
+library(tfdatasets)
+
+
+transformer = reticulate::import('transformers')
+
+# GPU optimisation. Comment if using CPU.
+physical_devices <- tf$config$list_physical_devices('GPU')
+tf$config$experimental$set_memory_growth(physical_devices[[1]],TRUE)
+# End of GPU optimisation
+
+tf$keras$backend$set_floatx('float32')
+```
+
+# Reading data and splitting train and validation set
+
+```{r}
+df <- read.csv("../../data/train.csv") # DEPENDS ON RSTUDIO WORKING DIRECTORY CONFIG
+df <- df %>% mutate(sentiment = sentiment - 1) %>%
+  data.table::as.data.table()
+
+idx_train <- sample.int(nrow(df)*0.8)
+
+train <- df[idx_train,]
+test <- df[!idx_train,]
+```
+
+# Tokenise, load data, and train
+
+```{r}
+max_len <- 50L
+epochs <- 3L
+batch_size <- 32
+
+tokenizer <- transformer$AutoTokenizer$from_pretrained('roberta-base', do_lower_case=T)
+
+# inputs
+text <- list()
+# outputs
+label <- list()
+
+data_prep <- function(data) {
+  for (i in 1:nrow(data)) {
+
+    txt <- tokenizer$encode(data[['tweet']][i],max_length = max_len,
+                           truncation=T, padding = 'max_length') %>%
+      t() %>%
+      as.matrix() %>% list()
+    lbl <- data[['sentiment']][i] %>% t()
+
+    text <- text %>% append(txt)
+    label <- label %>% append(lbl)
+  }
+  list(do.call(plyr::rbind.fill.matrix,text), do.call(plyr::rbind.fill.matrix,label))
+}
+
+train_ <- data_prep(train)
+test_ <- data_prep(test)
+
+# slice dataset
+tf_train <- tensor_slices_dataset(list(train_[[1]],train_[[2]])) %>%
+  dataset_batch(batch_size = batch_size, drop_remainder = TRUE) %>%
+  dataset_shuffle(128) %>% dataset_repeat(epochs)
+
+tf_test <- tensor_slices_dataset(list(test_[[1]],test_[[2]])) %>%
+  dataset_batch(batch_size = batch_size)
+
+model_ <- transformer$TFRobertaModel$from_pretrained('roberta-base')
+
+# create an input layer
+input <- layer_input(shape=c(max_len), dtype='int32')
+hidden_mean <- tf$reduce_mean(model_(input)[[1]], axis=1L) %>%
+  layer_dense(128,activation = 'relu')
+
+# create an output layer for multi-class classification
+output <- hidden_mean %>% layer_dense(64,activation = 'relu') %>% layer_dense(units = 3, activation='softmax')
+model <- keras_model(inputs=input, outputs = output)
+
+# compile with Adam, Categorical Cross-entropy Loss, and Accuracy metric
+model %>% compile(optimizer= tf$keras$optimizers$Adam(learning_rate=1e-5, epsilon=1e-08, clipnorm=1.0),
+                  loss = tf$losses$SparseCategoricalCrossentropy(from_logits=F),
+                  metrics = 'accuracy')
+
+yeay <- model$fit(tf_train, validation_data=tf_test, epochs=3L)
+```
+
+# Save the model
+
+```{r}
+# yeay$model$save("roberta-tweets-3-2")
+```
+
+# Predict test data
+
+```{r}
+test <- read.csv("../../data/test.csv") # DEPENDS ON RSTUDIO WORKING DIRECTORY CONFIG
+test <- test %>%
+  data.table::as.data.table()
+```
+
+
+
+```{r}
+data_prep <- function(data) {
+  for (i in 1:nrow(data)) {
+
+    txt <- tokenizer$encode(data[['tweet']][i],max_length = max_len,
+                           truncation=T, padding = 'max_length') %>%
+      t() %>%
+      as.matrix() %>% list()
+
+    text <- text %>% append(txt)
+  }
+  list(do.call(plyr::rbind.fill.matrix,text))
+}
+
+testing_ <- data_prep(test)
+```
+
+```{r}
+pred <- yeay$model$predict(testing_[[1]])
+```
+
+```{r}
+pred_df <- as.data.frame(pred)
+```
+
+
+```{r}
+pred_ls <- apply(pred_df,1,function(x) which(x==max(x)))
+```
+
+```{r}
+final_pred_df <- as.data.frame(pred_ls)
+```
+
+```{r}
+final_pred_df$id <- test$id
+```
+
+```{r}
+final_pred_df <-  final_pred_df %>% select(id, pred_ls) %>% rename(sentiment = pred_ls)
+```
+
+```{r}
+write.csv(final_pred_df, "../../predict/roberta-3-2.csv", row.names = FALSE) # DEPENDING ON RSTUDIO WORKING DIRECTORY
+```
+

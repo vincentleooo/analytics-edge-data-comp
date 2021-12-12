@@ -1,0 +1,158 @@
+---
+title: "R Notebook"
+output: html
+---
+
+```{r include=FALSE}
+reticulate::py_install('transformers', pip = TRUE)
+
+# library(tidyverse)
+# library(textclean)
+library(keras)
+library(tensorflow)
+library(dplyr)
+library(tfdatasets)
+
+
+transformer = reticulate::import('transformers')
+
+physical_devices = tf$config$list_physical_devices('GPU')
+tf$config$experimental$set_memory_growth(physical_devices[[1]],TRUE)
+
+tf$keras$backend$set_floatx('float32')
+```
+
+```{r}
+df <- read.csv("./data/train.csv")
+df = df %>% mutate(sentiment = sentiment - 1) %>%  rename(target = sentiment, comment_text = tweet) %>% 
+  data.table::as.data.table()
+
+idx_train = sample.int(nrow(df)*0.8)
+
+train = df[idx_train,]
+test = df[!idx_train,]
+```
+
+```{r}
+max_len = 50L
+epochs = 2
+batch_size = 32
+
+tokenizer = transformer$AutoTokenizer$from_pretrained('roberta-base', do_lower_case=T)
+
+# inputs
+text = list()
+# outputs
+label = list()
+
+data_prep = function(data) {
+  for (i in 1:nrow(data)) {
+
+    txt = tokenizer$encode(data[['comment_text']][i],max_length = max_len,
+                           truncation=T, padding = 'max_length') %>%
+      t() %>%
+      as.matrix() %>% list()
+    lbl = data[['target']][i] %>% t()
+
+    text = text %>% append(txt)
+    label = label %>% append(lbl)
+  }
+  list(do.call(plyr::rbind.fill.matrix,text), do.call(plyr::rbind.fill.matrix,label))
+}
+
+train_ = data_prep(train)
+test_ = data_prep(test)
+
+# slice dataset
+tf_train = tensor_slices_dataset(list(train_[[1]],train_[[2]])) %>%
+  dataset_batch(batch_size = batch_size, drop_remainder = TRUE) %>%
+  dataset_shuffle(128) %>% dataset_repeat(epochs)
+
+tf_test = tensor_slices_dataset(list(test_[[1]],test_[[2]])) %>%
+  dataset_batch(batch_size = batch_size)
+
+model_ = transformer$TFRobertaModel$from_pretrained('roberta-base')
+
+# create an input layer
+input = layer_input(shape=c(max_len), dtype='int32')
+hidden_mean = tf$reduce_mean(model_(input)[[1]], axis=1L) %>%
+  layer_dense(64,activation = 'relu')
+# create an output layer for binary classification
+output = hidden_mean %>% layer_dense(units = 3, activation='softmax')
+model = keras_model(inputs=input, outputs = output)
+
+# compile with AUC score
+model %>% compile(optimizer= tf$keras$optimizers$Adam(learning_rate=3e-5, epsilon=1e-08),
+                  loss = tf$losses$SparseCategoricalCrossentropy(from_logits=F),
+                  metrics = 'accuracy')
+
+# model = transformer$TFRobertaForMultipleChoice$from_pretrained('roberta-base', labels = c(1, 2, 3))
+# 
+# model %>% compile(optimizer= tf$keras$optimizers$Adam(learning_rate=3e-5, epsilon=1e-08, clipnorm=1.0),
+#                   loss = tf$losses$SparseCategoricalCrossentropy(from_logits=F),
+#                   metrics = 'accuracy')
+
+yeay=model$fit(tf_train, validation_data=tf_test, epochs=2L)
+```
+```{r}
+yeay$model$save("roberta-tweets")
+```
+
+```{r}
+test <- read.csv("./data/test.csv")
+test = test %>% rename(comment_text = tweet) %>% 
+  data.table::as.data.table()
+```
+
+```{r}
+yeay$model$predict(tokenizer$encode(test$comment_text[1],max_length = max_len,
+                           truncation=T, padding = 'max_length'))
+```
+
+
+```{r}
+data_prep = function(data) {
+  for (i in 1:nrow(data)) {
+
+    txt = tokenizer$encode(data[['comment_text']][i],max_length = max_len,
+                           truncation=T, padding = 'max_length') %>%
+      t() %>%
+      as.matrix() %>% list()
+
+    text = text %>% append(txt)
+  }
+  list(do.call(plyr::rbind.fill.matrix,text))
+}
+
+testing_ = data_prep(test)
+```
+
+```{r}
+pred <- yeay$model$predict(testing_[[1]])
+```
+
+```{r}
+pred_df <- as.data.frame(pred)
+```
+
+
+```{r}
+pred_ls <- apply(pred_df,1,function(x) which(x==max(x)))
+```
+
+```{r}
+final_pred_df <- as.data.frame(pred_ls)
+```
+
+```{r}
+final_pred_df$id <- test$id
+```
+
+```{r}
+final_pred_df <-  final_pred_df %>% select(id, pred_ls) %>% rename(sentiment = pred_ls)
+```
+
+```{r}
+write.csv(final_pred_df, "./predict/roberta.csv", row.names = FALSE)
+```
+
