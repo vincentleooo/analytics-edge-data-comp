@@ -2,6 +2,10 @@
 
 Competition code for The Analytics Edge module in SUTD. Data can be found from [Kaggle](https://www.kaggle.com/c/2021tae/leaderboard).
 
+### For code submission on eDimension
+
+We did not include the actual model that was produced by the code due to its size (~1.4 GB). The model can be found on our GitHub repository (requires Git LFS to be installed to clone the big model) or on [Google Drive](https://drive.google.com/drive/folders/1WQumb-2VD9DelqRvd5IA45li4ufyp6zT?usp=sharing) (availability not guaranteed long-term).
+
 ### Overview
 
 Our data consisted of observations gathered by citizens on the social media platform Twitter. The task was to develop an approach that determines, with the highest accuracy, the kind of weather a given set of tweets is referring to. Specifically, the task was to determine the sentiments of tweets.
