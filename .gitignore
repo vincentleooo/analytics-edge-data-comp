@@ -4,8 +4,6 @@ input/embeddings/wiki-news-300d-1M.vec
 src/python/*
 models/python/*
 predict/python_lstm/*
-models/roberta-tweets/*
-models/roberta-tweets-2/*
-models/roberta-tweets-3-2/*
+models/*
 submissions.zip
 Archive.zip
