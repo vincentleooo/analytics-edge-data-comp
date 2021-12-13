@@ -4,7 +4,7 @@ Competition code for The Analytics Edge module in SUTD. Data can be found from [
 
 ### For code submission on eDimension
 
-We did not include the actual model that was produced by the code due to its size (~1.4 GB). The model can be found on [Google Drive](https://drive.google.com/drive/folders/1WQumb-2VD9DelqRvd5IA45li4ufyp6zT?usp=sharing). You will need to download the whole folder and reference that folder's name when importing the model.
+We did not include the actual model that was produced by the code due to its size (~1.4 GB). The model can be found on [Google Drive](https://drive.google.com/drive/folders/1WQumb-2VD9DelqRvd5IA45li4ufyp6zT?usp=sharing). You will need to download the whole folder and reference that folder's name when importing the model. There is no need to download this unless the exact predictions need to be reproduced. Training on a Ryzen 9 3900X and RTX 2060 took less than 10 minutes at three epochs.
 
 ### Overview
 
